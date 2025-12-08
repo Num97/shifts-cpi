@@ -1,0 +1,18 @@
+export const labels: Record<string, string> = {
+  date: "Дата",
+  farm: "Хозяйство",
+  dmb: "ДМБ",
+  production: "Надой",
+  total_cows: "Коровы",
+  milking_duration: "Продолжительность",
+  cows_per_hour: "Коров в час",
+  total_number_reattaches: "Повт.соед",
+  total_manual_detach_count: "Руч.откл",
+  total_manual_mode_count: "Руч.режимы",
+  two_min_milk: "Молоко за 2 мин",
+  average_attach_duration: "Время на корову",
+  percent_total_number_reattaches: "% Повт.соед",
+  percent_total_manual_detach_count: "% Руч.откл",
+  percent_total_manual_mode_count: "% Руч.режимы",
+  percent_two_min_milk: "% Молоко за 2 мин",
+}
