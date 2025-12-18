@@ -41,3 +41,41 @@ export interface IndicatorItem {
 
 // Indicators response
 export type IndicatorsResponse = IndicatorItem[];
+
+// ---- RECOMMENDATIONS ----
+
+export type IndicatorsEfficiency = Record<string, number>;
+
+export interface ShiftEfficiency {
+  shift_id: number;
+  overall_efficiency: number;
+  indicators_efficiency: IndicatorsEfficiency;
+  message_success: string | null;
+  message_problems: string | null;
+  message_fail: string | null;
+}
+
+export interface ShiftPeriodRecommendation {
+  farm: string;
+  dmb: number;
+
+  date_start: string | null;
+  date_end: string | null;
+
+  overall_efficiency: number;
+  indicators_efficiency: IndicatorsEfficiency;
+
+  shifts: ShiftEfficiency[];
+
+  message_success: string | null;
+  message_problems: string | null;
+  message_fail: string | null;
+}
+
+export interface ShiftRecommendationParams {
+  date_start: string;
+  date_end: string;
+  farm: string;
+  dmb: number;
+}
+// =================================================

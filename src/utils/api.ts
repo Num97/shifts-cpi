@@ -1,7 +1,6 @@
-// src/utils/api.ts
-
 import type { CpiParams } from './apiTypes';
 import type { CpiResponse, IndicatorsResponse, IndicatorItem } from './forms';
+import type { ShiftPeriodRecommendation, ShiftRecommendationParams } from './forms';
 
 // ---------------------
 // Универсальный GET
@@ -95,3 +94,23 @@ export function getCpi(params: CpiParams) {
 
   return apiGet<CpiResponse>(`/api/v1/shifts/cpi?${query.toString()}`);
 }
+
+// =================================================
+/*                     SHIFTS — Recommendations    */
+// =================================================
+
+export function getRecommendation(
+  params: ShiftRecommendationParams
+) {
+  const query = new URLSearchParams({
+    date_start: params.date_start,
+    date_end: params.date_end,
+    farm: params.farm,
+    dmb: String(params.dmb),
+  });
+
+  return apiGet<ShiftPeriodRecommendation>(
+    `/api/v1/shifts/cpi/recommendations?${query.toString()}`
+  );
+}
+

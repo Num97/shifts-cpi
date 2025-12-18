@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   Button,
   Select,
@@ -40,7 +40,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ criteriaActive, onToggleCriteria, onToggleOverview, overviewActive }) => {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const today = new Date()
 
@@ -130,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({ criteriaActive, onToggleCriteria
     }
   }, [farm, dmb])
 
-  const goHub = () => navigate('/hub')
+  const goHub = () => window.location.assign('/hub');
 
   const selectTriggerClasses =
     'h-10 px-3 flex items-center justify-center gap-2 bg-white text-gray-900 border border-gray-300 rounded-md shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors max-w-[160px] w-full truncate'

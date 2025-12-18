@@ -8,10 +8,12 @@ import { labels } from "@/constants/labels";
 import {  AnimatePresence, motion } from "framer-motion";
 
 interface Props {
-  indicator: IndicatorItem;
+  indicator?: IndicatorItem;
   cpiData: CpiItem[];
   farm: string;
   dmb: number;
+  filteredSortedIndicators?: IndicatorItem[];
+  aggregateByShifts?: boolean;
 }
 
 interface ShiftStats {
@@ -30,33 +32,68 @@ const getBarColor = (percent: number) => {
 
 const formatPercent = (p: number) => `${Math.round(p)}%`;
 
-const CpiOverviewGraphic: React.FC<Props> = ({ indicator, cpiData, farm, dmb }) => {
+const CpiOverviewGraphic: React.FC<Props> = ({ indicator, cpiData, farm, dmb, filteredSortedIndicators, aggregateByShifts }) => {
   // считаем статистику по сменам: total, success, percent
+
+const title = useMemo(() => {
+  if (!indicator) return "Общая эффективность";
+  return labels[indicator.indicator] || indicator.indicator;
+}, [indicator]);
+
+const sumCriteriaTitle = useMemo(() => {
+  if (!aggregateByShifts)
+    return 'Выходы'
+
+  return 'Критерии'
+}, [aggregateByShifts]);
+
 const stats: ShiftStats[] = useMemo(() => {
   const shifts = Array.from(new Set(cpiData.map((r) => r.shift_id))).sort((a, b) => a - b);
+
   return shifts.map((shiftId) => {
     const shiftRows = cpiData.filter((r) => r.shift_id === shiftId);
 
-    let successCount = 0;
-    let sumValues = 0;
+    if (aggregateByShifts && filteredSortedIndicators) {
+      // НОВЫЙ РЕЖИМ: общая эффективность по сменам
+      let totalCount = 0;
+      let successCount = 0;
 
-    for (const row of shiftRows) {
-      const key = indicator.indicator as keyof CpiItem;
-      const value = Number(row[key]);
-      sumValues += value;
+      shiftRows.forEach(row => {
+        filteredSortedIndicators.forEach(ind => {
+          const key = ind.indicator as keyof CpiItem;
+          const value = Number(row[key]);
+          totalCount++;
+          const isSuccess = ind.more_than ? value >= ind.value : value <= ind.value;
+          if (isSuccess) successCount++;
+        });
+      });
 
-      const target = indicator.value;
-      const isSuccess = indicator.more_than ? value >= target : value <= target;
-      if (isSuccess) successCount++;
+      const percent = totalCount > 0 ? (successCount / totalCount) * 100 : 0;
+      const averageValue = percent; // можно использовать percent или среднее значение по всем
+      return { shift: shiftId, total: totalCount, success: successCount, percent, averageValue };
+    } else if (indicator) {
+      // СТАРЫЙ РЕЖИМ: один индикатор
+      let successCount = 0;
+      let sumValues = 0;
+
+      for (const row of shiftRows) {
+        const key = indicator.indicator as keyof CpiItem;
+        const value = Number(row[key]);
+        sumValues += value;
+        const target = indicator.value;
+        const isSuccess = indicator.more_than ? value >= target : value <= target;
+        if (isSuccess) successCount++;
+      }
+
+      const total = shiftRows.length;
+      const percent = total > 0 ? (successCount / total) * 100 : 0;
+      const averageValue = total > 0 ? sumValues / total : 0;
+      return { shift: shiftId, total, success: successCount, percent, averageValue };
     }
 
-    const total = shiftRows.length;
-    const percent = total > 0 ? (successCount / total) * 100 : 0;
-    const averageValue = total > 0 ? sumValues / total : 0;
-
-    return { shift: shiftId, total, success: successCount, percent, averageValue};
+    return { shift: shiftId, total: 0, success: 0, percent: 0, averageValue: 0 };
   });
-}, [cpiData, indicator]);
+}, [cpiData, indicator, aggregateByShifts, filteredSortedIndicators]);
 
 const getValueColor = (value: number, indicator: IndicatorItem) => {
   const target = indicator.value;
@@ -80,7 +117,7 @@ const realSeriesData = stats.map((s) => Number(s.percent.toFixed(2)));
 
 const series = [
   {
-    name: labels[indicator.indicator] || indicator.indicator,
+    name: title,
     data: visualSeriesData,
   }
 ];
@@ -145,7 +182,7 @@ const series = [
       intersect: true,
       x: { show: true },
       y: {
-        formatter: (val, opts) => {
+        formatter: (_, opts) => {
           const index = opts.dataPointIndex;
           const real = realSeriesData[index];
           return `${Math.round(real)}%`; // честный тултип
@@ -189,7 +226,7 @@ const series = [
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">{farm}</div>
           <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {labels[indicator.indicator] || indicator.indicator}
+            {title}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">ДМБ {dmb}</div>
         </div>
@@ -203,27 +240,48 @@ const series = [
 <div className="mt-4">
 <div className="flex items-center justify-between mb-2 text-sm text-gray-500 dark:text-gray-400 px-1">
 
-      
-    <div className="flex items-center gap-2">
-      <span
-        className='
-          inline-flex items-center gap-1
-          text-[12px] px-2 py-0.5 rounded-md border
-          bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-700
-        '
-      > Цель:
-        {indicator.more_than ? (
-          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 11-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707A1 1 0 114.293 8.293l5-5A1 1 0 0110 3z" clipRule="evenodd" />
-          </svg>
-        ) : (
-          <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 111.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 111.414 1.414l-5 5A1 1 0 0110 17z" clipRule="evenodd" />
-          </svg>
-        )}
-        {indicator.value}
-      </span>
-    </div>
+    {!aggregateByShifts ? (
+      <div className="flex items-center gap-2">
+        <span
+          className='
+            inline-flex items-center gap-1
+            text-[12px] px-2 py-0.5 rounded-md border
+            bg-indigo-100 text-indigo-700 border-indigo-200
+            dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-700
+          '
+        >
+          Цель:
+          {indicator!.more_than ? (
+            <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 11-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707A1 1 0 114.293 8.293l5-5A1 1 0 0110 3z" clipRule="evenodd" />
+            </svg>
+          ) : (
+            <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 17a1 1 0 01-.707-.293l-5-5a1 1 0 111.414-1.414L9 13.586V3a1 1 0 112 0v10.586l3.293-3.293a1 1 0 111.414 1.414l-5 5A1 1 0 0110 17z" clipRule="evenodd" />
+            </svg>
+          )}
+          {indicator!.value}
+        </span>
+      </div>
+    ) : ( 
+      <div className="flex items-center gap-2">
+        <span
+          className='
+            inline-flex items-center gap-1
+            text-[12px] px-2 py-0.5 rounded-md border
+            bg-indigo-100 text-indigo-700 border-indigo-200
+            dark:bg-indigo-900/40 dark:text-indigo-200 dark:border-indigo-700
+          '
+        >
+          Цель:
+            <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 01.707.293l5 5a1 1 0 11-1.414 1.414L11 6.414V17a1 1 0 11-2 0V6.414L5.707 9.707A1 1 0 114.293 8.293l5-5A1 1 0 0110 3z" clipRule="evenodd" />
+            </svg>
+          75%
+        </span>
+      </div>
+    )}
+
 
   <div className="hidden sm:flex gap-3 items-center">
     <div className="flex items-center gap-2">
@@ -255,10 +313,13 @@ const series = [
 >
   <AnimatePresence>
     {stats.map((s) => {
-      const shiftKey = `${farm}-${indicator.indicator}-shift-${s.shift}`;
-      const averageColorClass = getValueColor(s.averageValue, indicator).includes("emerald")
-        ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700/60 hover:bg-emerald-200 dark:hover:bg-emerald-700/50"
-        : "bg-red-100 text-red-800 border border-red-300 dark:bg-red-900/30 dark:text-red-200 dark:border-red-700/60 hover:bg-red-200 dark:hover:bg-red-700/50";
+      const shiftKey = `${farm}-${title}-shift-${s.shift}`;
+const averageColorClass = indicator
+  ? getValueColor(s.averageValue, indicator).includes("emerald")
+    ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700/60 hover:bg-emerald-200 dark:hover:bg-emerald-700/50"
+    : "bg-red-100 text-red-800 border border-red-300 dark:bg-red-900/30 dark:text-red-200 dark:border-red-700/60 hover:bg-red-200 dark:hover:bg-red-700/50"
+  : ""; // или undefined, если Badge не выводится в агрегатном режиме
+
 
 
       return (
@@ -272,7 +333,7 @@ const series = [
         >
           <Popover>
             <PopoverTrigger asChild>
-              <div className="cursor-pointer p-4 rounded-2xl bg-gray-200/80 dark:bg-gray-700/40 
+              <div className="cursor-pointer px-4 py-1 rounded-2xl bg-gray-200/80 dark:bg-gray-700/40 
                               border border-gray-200/40 dark:border-gray-500/40 shadow backdrop-blur-md 
                               hover:shadow-lg transition">
                 {/* Верхний ряд: название смены и процент */}
@@ -292,7 +353,7 @@ const series = [
                                     bg-gray-100 text-gray-700 border border-gray-300
                                     dark:bg-gray-800/30 dark:text-gray-300 dark:border-gray-500/40
                                     hover:bg-gray-200 dark:hover:bg-gray-700/50">
-                    Выходы: {s.total}
+                    {sumCriteriaTitle}: {s.total}
                   </Badge>
 
                   {/* Успех */}
@@ -311,11 +372,27 @@ const series = [
                   </Badge>
 
                   {/* Среднее значение */}
-                  <Badge
-                    className={`text-xs px-2.5 py-1 rounded-lg font-semibold border ${averageColorClass}`}
-                  >
-                    Ср.: {s.averageValue.toFixed(1)}
-                  </Badge>
+                  {!aggregateByShifts ? (
+                    <Badge
+                      className={`text-xs px-2.5 py-1 rounded-lg font-semibold border ${averageColorClass}`}
+                    >
+                      Ср.: {s.averageValue.toFixed(1)}
+                    </Badge>
+                  ) : (
+                    <Badge
+                      className={`text-xs px-2.5 py-1 rounded-lg font-semibold border
+                        ${
+                          Number(s.percent.toFixed(0) || 0) < 50
+                            ? "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-200 dark:border-red-700/60 hover:bg-red-200 dark:hover:bg-red-700/50"
+                            : Number(s.percent.toFixed(0) || 0) < 75
+                            ? "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/60 hover:bg-amber-200 dark:hover:bg-amber-700/50"
+                            : "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-700/60 hover:bg-emerald-200 dark:hover:bg-emerald-700/50"
+                        }
+                      `}
+                      >
+                        Эф.: {s.averageValue.toFixed(0)}%
+                    </Badge>
+                  )}
                 </div>
               </div>
             </PopoverTrigger>
@@ -323,10 +400,12 @@ const series = [
             <PopoverContent className="w-64 p-4 bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200/40 dark:border-gray-800/40">
               <div className="text-sm font-medium mb-2">Подробности смены {s.shift}</div>
               <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                <div>• Выходов: <b>{s.total}</b></div>
+                <div>• {sumCriteriaTitle}: <b>{s.total}</b></div>
                 <div>• Успешных: <b>{s.success}</b></div>
                 <div>• Результативность: <b>{formatPercent(s.percent)}</b></div>
-                <div>• Среднее: <b>{s.averageValue.toFixed(1)}</b></div>
+                {!aggregateByShifts && (
+                  <div>• Среднее: <b>{s.averageValue.toFixed(1)}</b></div>
+                  )}
               </div>
             </PopoverContent>
           </Popover>
